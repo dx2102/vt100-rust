@@ -290,7 +290,7 @@ impl Grid {
 
         for (i, row) in rows.enumerate() {
             if i > 0 && !wrapping {
-                contents.extend_from_slice(b"\r\n");
+                write_row_break(contents, &mut prev_attrs);
             }
 
             (prev_attrs, prev_hyperlink_id) = row
@@ -323,7 +323,7 @@ impl Grid {
 
         for (i, row) in self.all_rows().enumerate() {
             if i > 0 && !wrapping {
-                contents.extend_from_slice(b"\r\n");
+                write_row_break(contents, &mut prev_attrs);
             }
 
             (prev_attrs, prev_hyperlink_id) = row
@@ -728,7 +728,9 @@ impl Grid {
             self.rows
                 .insert(usize::from(self.scroll_bottom) + 1, self.new_row());
             let removed = self.rows.remove(usize::from(self.scroll_top));
-            if self.scrollback_len > 0 && !self.scroll_region_active() {
+            // Like xterm, a region that starts at the top row still feeds
+            // scrollback. Inline TUIs (e.g. codex) push history this way.
+            if self.scrollback_len > 0 && self.scroll_top == 0 {
                 self.scrollback.push_back(removed);
                 while self.scrollback.len() > self.scrollback_len {
                     self.scrollback.pop_front();
@@ -770,10 +772,6 @@ impl Grid {
 
     pub fn scroll_region(&self) -> (u16, u16) {
         (self.scroll_top, self.scroll_bottom)
-    }
-
-    fn scroll_region_active(&self) -> bool {
-        self.scroll_top != 0 || self.scroll_bottom != self.size.rows - 1
     }
 
     pub fn origin_mode(&self) -> bool {
@@ -925,4 +923,18 @@ pub struct Size {
 pub struct Pos {
     pub row: u16,
     pub col: u16,
+}
+
+/// A replay makes the receiving terminal scroll, and terminals fill the new
+/// line with the current background color. Reset attributes before each line
+/// break so a colored row does not bleed into the blank row below it.
+fn write_row_break(
+    contents: &mut Vec<u8>,
+    prev_attrs: &mut crate::attrs::Attrs,
+) {
+    if *prev_attrs != crate::attrs::Attrs::default() {
+        crate::term::ClearAttrs.write_buf(contents);
+        *prev_attrs = crate::attrs::Attrs::default();
+    }
+    contents.extend_from_slice(b"\r\n");
 }
