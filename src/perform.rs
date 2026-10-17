@@ -217,28 +217,31 @@ impl<CB: crate::callbacks::Callbacks> vte::Perform for WrappedScreen<CB> {
                 self.screen.set_hyperlink(params, uri);
             }
             [b"4", rest @ ..] => {
-                if !handle_indexed_palette_osc(&mut self.screen, rest) {
+                // Queries (`?`) need a reply, which only the caller can send.
+                let has_query =
+                    rest.chunks(2).any(|pair| pair.get(1) == Some(&&b"?"[..]));
+                if !handle_indexed_palette_osc(&mut self.screen, rest) || has_query {
                     self.callbacks.unhandled_osc(&mut self.screen, params);
                 }
             }
             [b"10", color] => {
                 if let Some(color) = crate::palette::parse_color(color) {
                     self.screen.palette_mut().set_foreground(color);
-                } else if *color != b"?" {
+                } else {
                     self.callbacks.unhandled_osc(&mut self.screen, params);
                 }
             }
             [b"11", color] => {
                 if let Some(color) = crate::palette::parse_color(color) {
                     self.screen.palette_mut().set_background(color);
-                } else if *color != b"?" {
+                } else {
                     self.callbacks.unhandled_osc(&mut self.screen, params);
                 }
             }
             [b"12", color] => {
                 if let Some(color) = crate::palette::parse_color(color) {
                     self.screen.palette_mut().set_cursor(color);
-                } else if *color != b"?" {
+                } else {
                     self.callbacks.unhandled_osc(&mut self.screen, params);
                 }
             }

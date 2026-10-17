@@ -62,7 +62,10 @@ pub trait Callbacks {
     ) {
     }
     /// This callback is called when the terminal receives a OSC sequence
-    /// (`\e]`) which is otherwise not implemented.
+    /// (`\e]`) which is otherwise not implemented. Color queries (OSC 4, 10,
+    /// 11 and 12 with a `?` spec) also land here, since answering them means
+    /// writing to the pty, which the parser can't do. For OSC 4, any color
+    /// sets in the same sequence have already been applied.
     fn unhandled_osc(&mut self, _: &mut crate::Screen, _params: &[&[u8]]) {}
 }
 
